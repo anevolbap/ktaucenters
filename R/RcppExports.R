@@ -162,6 +162,10 @@ robinden <- function(D, n_clusters, mp) {
     .Call('_ktaucenters_robinden', PACKAGE = 'ktaucenters', D, n_clusters, mp)
 }
 
+.robinden_data <- function(x, n_clusters, mp) {
+    .Call('_ktaucenters_robinden_data', PACKAGE = 'ktaucenters', x, n_clusters, mp)
+}
+
 #' Normal Consistency Constants
 #'
 #' M scale tuning constants so it is consistent with the standard

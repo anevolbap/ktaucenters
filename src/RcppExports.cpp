@@ -97,6 +97,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// robinden_data
+List robinden_data(NumericMatrix x, const std::size_t n_clusters, const std::size_t mp);
+RcppExport SEXP _ktaucenters_robinden_data(SEXP xSEXP, SEXP n_clustersSEXP, SEXP mpSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const std::size_t >::type n_clusters(n_clustersSEXP);
+    Rcpp::traits::input_parameter< const std::size_t >::type mp(mpSEXP);
+    rcpp_result_gen = Rcpp::wrap(robinden_data(x, n_clusters, mp));
+    return rcpp_result_gen;
+END_RCPP
+}
 // normal_consistency_constants
 double normal_consistency_constants(const std::size_t p);
 RcppExport SEXP _ktaucenters_normal_consistency_constants(SEXP pSEXP) {
@@ -130,6 +143,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_ktaucenters_psiOpt", (DL_FUNC) &_ktaucenters_psiOpt, 2},
     {"_ktaucenters_derpsiOpt", (DL_FUNC) &_ktaucenters_derpsiOpt, 2},
     {"_ktaucenters_robinden", (DL_FUNC) &_ktaucenters_robinden, 3},
+    {"_ktaucenters_robinden_data", (DL_FUNC) &_ktaucenters_robinden_data, 3},
     {"_ktaucenters_normal_consistency_constants", (DL_FUNC) &_ktaucenters_normal_consistency_constants, 1},
     {"_ktaucenters_Mscale", (DL_FUNC) &_ktaucenters_Mscale, 3},
     {NULL, NULL, 0}

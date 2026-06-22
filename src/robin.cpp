@@ -1,6 +1,8 @@
 #include "knn.h"
 #include "utils.h"
+#include "nanoflann.hpp"
 #include <Rcpp.h>
+#include <vector>
 using namespace Rcpp;
 
 NumericVector point_density(NumericMatrix D, const std::size_t k) {
@@ -146,5 +148,110 @@ List robinden(NumericMatrix D, const std::size_t n_clusters,
     sorted_indices = top_index(minimum_values, n, true);
     centers[iter] = robin_center(idp, sorted_indices, crit_robin);
   }
+  return List::create(_["centers"] = centers, _["idpoints"] = idp);
+}
+
+// ---- kd-tree fast path (internal) ----
+// Same algorithm and tie behavior as robinden(), but sources the kNN from a
+// kd-tree on the data and computes center distances on the fly, avoiding the
+// O(n^2) distance matrix. Used by ktaucenters()/ktaucentersfast().
+
+struct MatAdaptor {
+  const NumericMatrix &mat;
+  MatAdaptor(const NumericMatrix &m) : mat(m) {}
+  inline std::size_t kdtree_get_point_count() const { return mat.nrow(); }
+  inline double kdtree_get_pt(const std::size_t idx, const std::size_t dim) const {
+    return mat(idx, dim);
+  }
+  template <class BBOX> bool kdtree_get_bbox(BBOX &) const { return false; }
+};
+typedef nanoflann::KDTreeSingleIndexAdaptor<
+    nanoflann::L2_Simple_Adaptor<double, MatAdaptor>, MatAdaptor>
+    KDTree;
+
+static inline double row_dist(const NumericMatrix &x, std::size_t a,
+                              std::size_t b) {
+  const std::size_t p = x.ncol();
+  double s = 0.0, d;
+  for (std::size_t j = 0; j < p; ++j) {
+    d = x(a, j) - x(b, j);
+    s += d * d;
+  }
+  return std::sqrt(s);
+}
+
+// [[Rcpp::export(".robinden_data")]]
+List robinden_data(NumericMatrix x, const std::size_t n_clusters,
+                   const std::size_t mp) {
+  const std::size_t n = x.nrow();
+  const std::size_t p = x.ncol();
+
+  // Build the kd-tree and query the mp nearest neighbors of each point.
+  MatAdaptor adaptor(x);
+  KDTree index(p, adaptor, nanoflann::KDTreeSingleIndexAdaptorParams(10));
+  index.buildIndex();
+
+  NumericMatrix knn_dist(n, mp);
+  IntegerMatrix knn_id(n, mp);
+  std::vector<double> kdist(n);
+  std::vector<unsigned int> ret_idx(mp + 1);
+  std::vector<double> ret_d2(mp + 1);
+  std::vector<double> query(p);
+  for (std::size_t i = 0; i < n; ++i) {
+    for (std::size_t j = 0; j < p; ++j)
+      query[j] = x(i, j);
+    index.knnSearch(&query[0], mp + 1, &ret_idx[0], &ret_d2[0]);
+    std::size_t out = 0;
+    for (std::size_t r = 0; r < mp + 1 && out < mp; ++r) {
+      if ((std::size_t)ret_idx[r] == i)
+        continue; // drop self
+      knn_id(i, out) = (int)ret_idx[r];
+      knn_dist(i, out) = std::sqrt(ret_d2[r]);
+      ++out;
+    }
+    kdist[i] = knn_dist(i, mp - 1);
+  }
+
+  // Inverse point density (same definition as point_density()).
+  NumericVector idp(n);
+  for (std::size_t i = 0; i < n; ++i) {
+    double s = 0.0;
+    for (std::size_t j = 0; j < mp; ++j)
+      s += std::max(kdist[knn_id(i, j)], knn_dist(i, j));
+    idp[i] = s / (double)mp;
+  }
+
+  const std::size_t position =
+      (std::size_t)(std::trunc(
+          std::max(0.5, 0.96 * (1 - (1.5 / n_clusters))) * n)) -
+      1;
+  NumericVector sorted_idp = clone(idp).sort(false);
+  const double crit_robin = sorted_idp[position];
+
+  std::size_t r = which_min(idp);
+  NumericVector dist_r(no_init(n));
+  for (std::size_t c = 0; c < n; ++c)
+    dist_r[c] = row_dist(x, c, r);
+  IntegerVector sorted_indices = top_index(dist_r, n, true);
+
+  IntegerVector centers(n_clusters);
+  centers[0] = robin_center(idp, sorted_indices, crit_robin);
+
+  // Running minimum distance to the centers chosen so far.
+  NumericVector mindist(no_init(n));
+  for (std::size_t c = 0; c < n; ++c)
+    mindist[c] = row_dist(x, c, centers[0]);
+
+  for (std::size_t iter = 1; iter < n_clusters; ++iter) {
+    sorted_indices = top_index(mindist, n, true);
+    centers[iter] = robin_center(idp, sorted_indices, crit_robin);
+    std::size_t cc = centers[iter];
+    for (std::size_t c = 0; c < n; ++c) {
+      double dd = row_dist(x, c, cc);
+      if (dd < mindist[c])
+        mindist[c] = dd;
+    }
+  }
+
   return List::create(_["centers"] = centers, _["idpoints"] = idp);
 }

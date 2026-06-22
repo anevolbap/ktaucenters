@@ -119,10 +119,8 @@ ktaucenters <- function(X,
       
     }
     if (trial == nstart + 1) {
-      retROB <- robinden(as.matrix(dist(X)),
-                         n_clusters = K,
-                         10)
-      
+      retROB <- .robinden_data(X, n_clusters = K, 10)
+
       centers0 <- X[retROB$centers + 1,]
     }
     
@@ -260,7 +258,7 @@ ktaucentersfast <- function(x,
   }
   
   if (use_robin) {
-    robin_centers_idx <- robinden(.distance(x), n_clusters, 10)$centers + 1
+    robin_centers_idx <- .robinden_data(x, n_clusters, 10)$centers + 1
     robin_centers <- x[robin_centers_idx,]
     init_centers <- append(init_centers, list(robin_centers))
   }
