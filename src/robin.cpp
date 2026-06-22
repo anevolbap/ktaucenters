@@ -1,6 +1,6 @@
 #include "knn.h"
 #include "utils.h"
-#include "nanoflann.hpp"
+#include "nanoflann.h"
 #include <Rcpp.h>
 #include <vector>
 using namespace Rcpp;
