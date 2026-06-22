@@ -200,7 +200,7 @@ List robinden_data(NumericMatrix x, const std::size_t n_clusters,
   for (std::size_t i = 0; i < n; ++i) {
     for (std::size_t j = 0; j < p; ++j)
       query[j] = x(i, j);
-    index.knnSearch(&query[0], mp + 1, &ret_idx[0], &ret_d2[0]);
+    (void)index.knnSearch(&query[0], mp + 1, &ret_idx[0], &ret_d2[0]);
     std::size_t out = 0;
     for (std::size_t r = 0; r < mp + 1 && out < mp; ++r) {
       if ((std::size_t)ret_idx[r] == i)
